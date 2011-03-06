@@ -1,12 +1,10 @@
 #!/usr/bin/env node
 var http = require('http');
-
-var server = http
-               .createServer(requestListener)
-               .listen(8000);
-
-function requestListener(req, res) {
+var server = http.createServer();
+var handleReq = function(req, res) {
 	res.writeHeader(200, {'Content-Type': 'text/plain'});
 	res.write('Hello World!\n');
 	res.end();
 }
+server.on('request', handleReq);
+server.listen(8000);
