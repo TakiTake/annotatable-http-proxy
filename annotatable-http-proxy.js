@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 var http = require('http');
-var url = require('url');
+var url  = require('url');
 var server = http.createServer();
 
 server.on('request', requestListener);
@@ -24,10 +24,24 @@ function requestListener(req, res) {
 
 	function onResponse(clientResponse) {
 		var statusCode = clientResponse.statusCode;
+		var enc = /text/.test(clientResponse.headers['contents-type']) ? 'utf8' : 'binary';
+
+		// access log
+		// console.log('[' + new Date() + '] ' + '"' + req.method + ' ' + req.url + '" '
+		// 		+ statusCode + ' "' + req.headers['user-agent'] + '"');
+
+		clientResponse.setEncoding(enc);
 		if (statusCode < 200 || 300 <= statusCode) {
 			if (!callbackSent) {
-				res.writeHead(statusCode, {'Content-Type': 'text/plain'});
-				res.end(statusCode);
+				res.writeHead(statusCode, clientResponse.headers);
+
+				if (clientResponse.method === 'HEAD' || statusCode === 304) {
+					res.end('');
+				}
+				else {
+					res.end(statusCode, enc);
+				}
+
 				callbackSent = true;
 			}
 			client.end();
@@ -35,7 +49,6 @@ function requestListener(req, res) {
 			return;
 		}
 
-		clientResponse.setEncoding('utf8');
 		clientResponse.on('data', onData);
 		clientResponse.on('end', onEnd);
 
@@ -44,10 +57,16 @@ function requestListener(req, res) {
 		}
 
 		function onEnd() {
-			console.log('[response]', contents.join(''));
 			if (!callbackSent) {
-				res.writeHead(200, {'Content-Type': 'text/plain'});
-				res.end(contents.join(''));
+				res.writeHead(statusCode, clientResponse.headers);
+
+				if (clientResponse.method === 'HEAD') {
+					res.end('');
+				}
+				else {
+					res.end(contents.join(''), enc);
+				}
+
 				callbackSent = true;
 			}
 		}
@@ -56,7 +75,7 @@ function requestListener(req, res) {
 	function onError(e) {
 		if (!callbackSent) {
 			res.writeHead(500, {'Content-Type': 'text/plain'});
-			res.end(e.message);
+			res.end(e.message, 'utf8');
 			callbackSent = true;
 		}
 	}
@@ -64,7 +83,7 @@ function requestListener(req, res) {
 	function onClose() {
 		if (!callbackSent) {
 			res.writeHead(500, {'Content-Type': 'text/plain'});
-			res.end('Connection closed unexpectedly');
+			res.end('Connection closed unexpectedly', 'utf8');
 			callbackSent = true;
 		}
 	}
