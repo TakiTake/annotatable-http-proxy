@@ -1,19 +1,33 @@
 #!/usr/bin/env node
 
+var fs   = require('fs');
 var http = require('http');
 var url  = require('url');
 var util = require('util');
-var server = http.createServer();
+var CONF_FILE_PATH = './etc/conf.json';
 
-server
-	.on('request', requestListener)
-	.listen(8000);
+var conf = null;
+var server = http.createServer()
 
-var DEBUG = false;
 function log(str) {
-	DEBUG && util.puts(str);
+	conf.debug && util.puts(str);
 }
 
+function reload(filename, sync) {
+	if (sync) {
+		conf = JSON.parse(fs.readFileSync(filename, 'utf8'));
+	} else {
+		fs.readFile(filename, 'utf8', function(err, data) {
+			if (err) {
+				throw err;
+			}
+
+			conf = JSON.parse(data);
+		})
+	}
+}
+
+// TODO: close request if blowser closed
 function requestListener(req, res) {
 	log(req.url);
 	var requestUrl = url.parse(req.url);
@@ -33,7 +47,7 @@ function requestListener(req, res) {
 		var enc = /text/.test(clientResponse.headers['contents-type']) ? 'utf8' : 'binary';
 
 		// access log
-		// console.log('[' + new Date() + '] ' + '"' + req.method + ' ' + req.url + '" '
+		// log('[' + new Date() + '] ' + '"' + req.method + ' ' + req.url + '" '
 		// 		+ statusCode + ' "' + req.headers['user-agent'] + '"');
 
 		res.writeHead(statusCode, clientResponse.headers);
@@ -96,3 +110,20 @@ function getPort(port, protocol) {
 
 	return port;
 }
+
+function init() {
+	reload(CONF_FILE_PATH, true);
+	
+	fs.watchFile(CONF_FILE_PATH, function(curr, prev) {
+		if (curr.mtime > prev.mtime) {
+			reload(CONF_FILE_PATH);
+		}
+	});
+	
+	server.on('request', requestListener)
+		    .listen(conf.port);
+	
+	log("Listening " + conf.port);
+}
+
+init();
