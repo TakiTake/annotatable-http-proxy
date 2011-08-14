@@ -1,4 +1,7 @@
 {
-	"debug": true,
+	"log": {
+		"level": "debug",
+		"file": ""
+	},
 	"port": 8000
 }
